@@ -1,0 +1,143 @@
+---
+title: "ds202_hw5"
+author: "Syed Hasan github:https://github.com/shasan2519/ds202_lab5"
+date: "4/15/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=F}
+accident <- read.csv("accident.csv")
+person <- read.csv("person.csv")
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+# Part 1
+```{r}
+countDay <- count(accident,DAY_WEEK)
+countDay
+Days<- max(countDay)
+Days
+```
+  
+Explaination: Accidents are happening almost on a daily basis. 
+  
+
+```{r}
+
+countHour <- count(accident,HOUR) 
+countHour
+Hours<- max(countHour)
+Hours
+
+```
+  
+Explaination: Accident happening at all hours.
+  
+
+```{r}
+Drunk=subset(accident, accident$DRUNK_DR > 0 )
+nrow(Drunk)
+```
+  
+Answer: 8769 drunk drivers
+
+  
+
+# Part 2
+```{r}
+p2 <- person %>% filter(PER_TYP==1) %>% right_join(accident)
+
+
+daily <- p2 %>% group_by(DAY_WEEK) %>% summarize(count = n())
+daily$DAY_WEEK <- as.factor(daily$DAY_WEEK)
+levels(daily$DAY_WEEK) <-   c("Su","M","T","W","Th","F","Sa")
+
+h <- p2 %>% group_by(HOUR) %>% summarize(h = n())
+
+p2$SEX <- as.factor(p2$SEX)
+levels(p2$SEX) <- c("M","F","U","U")
+p2$SEX[is.na(p2$SEX)] <- "U"
+
+
+
+sex <- p2 %>% group_by(SEX) %>% summarize(gender = n())
+```
+
+```{r}
+daily
+daily %>% ggplot(aes(x=DAY_WEEK,y=count))+ geom_col() + labs(x="week Day",y=" accident tally")
+```
+  
+Weekends have a higher rate of accidents
+  
+```{r}
+h
+h %>% filter(HOUR<90) %>% ggplot(aes(x=HOUR,y=h))+ geom_step() + geom_point() + labs(x="time",y="accident tally")
+```
+  
+highers accidents during the late hours wiht lowest around Dawn time
+  
+```{r}
+sex
+sex %>%filter(SEX %in% c("M","F")) %>% ggplot(aes(x=SEX,y=gender))+ geom_col() + labs(x="sex",y="accident tally")
+```
+  
+Femlaes are less likely to crash than males
+  
+    
+# Part 3  
+  
+```{r}
+library(maps)
+library(mapproj)
+us1 <- readxl::read_xlsx(("US_GLC.xlsx"), col_types = c("text","text","text","text","text","text","text","text","text","skip"))
+ust <- readxl::read_xlsx("UST_GLC.xlsx")
+
+us1$STATE <- as.numeric(us1$`State Code`)
+us1$COUNTY <- as.numeric(us1$`County Code`)
+
+
+p31 <- accident %>% left_join(us1)
+head(p31)
+county <- map_data('county')
+
+p32 <- p31 %>% select(`State Name`,`County Name`,MONTH)
+
+p3summer <- p32 %>% group_by(`State Name`,`County Name`) %>% summarize(count = n())
+
+p3summer$region <- tolower(p3summer$`State Name`)
+p3summer$subregion <- tolower(p3summer$`County Name`)
+
+p3 <- p3summer %>%select(region, subregion, count) %>% inner_join(county)
+par(mfrow=c(2,1))
+p3 %>% ggplot(aes(x=long,y=lat,group=group)) + geom_path() + geom_polygon(aes(fill=count))  + scale_fill_gradient(low='green',high='black')+coord_map() + labs(x="long",y="lat",title="Choropleth Plot")
+
+```
+
+Major green (high accident rate) areas are all Chicago, Parts of texas, Parts of southern California
+   
+  
+```{r}
+state <- map_data('state')
+
+p3_summer <- p32 %>% filter(MONTH %in% c(4:9)) %>% mutate(region = tolower(`State Name`)) %>% group_by(region) %>% summarize(count = n())
+
+p3winter <- p32 %>% filter(MONTH %in% c(1:3,10:12)) %>%mutate(region = tolower(`State Name`)) %>%group_by(region) %>%summarize(count = n())
+
+p3season <- data.frame(region=p3winter$region,diff = (p3_summer$count-p3winter$count))
+p3f <- p3season %>%inner_join(state)
+
+p3f %>% ggplot(aes(x=long,y=lat,group=group)) + geom_path() + geom_polygon(aes(fill=diff))  + scale_fill_gradient(low='green',high='black')+coord_map() + labs(x="long",y="lat")
+```
+  
+All the state where snow is most presistent like IL, New york and midwest have high a differnce
+
